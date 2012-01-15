@@ -2,7 +2,6 @@ package polygenlib
 
 import (
 	"testing"
-	"os"
 	"os/exec"
 	"io/ioutil"
 )
@@ -15,7 +14,8 @@ func TestJavaGenerator(t *testing.T) {
 	
 	gen := JavaGenerator{}
 	files := gen.GenFiles(pkg)
-	names := []string{"Result.java", "Person.java",
+	names := []string{"RPCException.java", "RPCError.java", 
+		"Result.java", "Person.java",
 		"SampleService.java", "SampleServiceRPCServer.java",
 		"SampleServiceRPCClient.java"}
 	if len(files) != len(names) {
@@ -28,11 +28,13 @@ func TestJavaGenerator(t *testing.T) {
 		}
 	}
 
-	dir, err := ioutil.TempDir(os.TempDir(), "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	//dir, err := ioutil.TempDir(os.TempDir(), "test")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//defer os.RemoveAll(dir)
+
+	dir := "/Users/james/go/src/github.com/coopernurse/polygen/lib/test"
 
 	err = WriteFiles(dir, files)
 	if err != nil {
@@ -47,7 +49,7 @@ func TestJavaGenerator(t *testing.T) {
 		t.Errorf("%d != %d files in dir: %s", len(flist), len(names), dir)
 	}
 
-	args := []string{"-d", dir}
+	args := []string{"-cp", "deps/jackson-mapper-lgpl-1.9.3.jar:deps/jackson-core-lgpl-1.9.3.jar", "-d", dir}
 	for i := 0; i < len(files); i++ {
 		args = append(args, files[i].FullPath(dir))
 	}
