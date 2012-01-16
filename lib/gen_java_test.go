@@ -16,8 +16,9 @@ func TestJavaGenerator(t *testing.T) {
 	files := gen.GenFiles(pkg)
 	names := []string{"RPCException.java", "RPCError.java", 
 		"Result.java", "Person.java",
-		"SampleService.java", "SampleServiceRPCServer.java",
-		"SampleServiceRPCClient.java"}
+		"SampleService.java", "SampleServiceDispatcher.java",
+		"SampleServiceHttpServer.java",
+		"SampleServiceClient.java", "SampleServiceTypes.java"}
 	if len(files) != len(names) {
 		t.Errorf("Expected %d files, got: %d", len(names), len(files))
 	}

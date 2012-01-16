@@ -1,6 +1,7 @@
 package polygenlib
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -18,8 +19,9 @@ func (g JavaGenerator) GenFiles(p *Package) []File {
 	for i := 0; i < len(p.Interfaces); i++ {
 		iface := p.Interfaces[i]
 		files = append(files, g.genServiceInterface(p, iface))
-		files = append(files, g.genServiceRPCServer(p, iface))
-		files = append(files, g.genServiceRPCClient(p, iface))
+		files = append(files, g.genServiceDispatcher(p, iface))
+		files = append(files, g.genServiceHttpServer(p, iface))
+		files = append(files, g.genServiceClient(p, iface))
 		files = append(files, g.genServiceTypes(p, iface))
 	}
 
@@ -127,17 +129,108 @@ func (g JavaGenerator) genServiceInterface(p *Package, iface Interface) File {
 	return File{JavaFilename(cname), b.b.Bytes()}
 }
 
-func (g JavaGenerator) genServiceRPCServer(p *Package, iface Interface) File {
-	cname := iface.Name + "RPCServer"
+func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
+	cname := iface.Name + "Dispatcher"
 	b := StartFile(p)
+	b.w("import org.codehaus.jackson.map.ObjectMapper;")
+	b.w("import org.codehaus.jackson.JsonNode;")
+	b.w("import org.codehaus.jackson.node.ObjectNode;")
+	b.blank()
 	b.f("public class %s {", cname)
 	b.blank()
+	b.f("    private %s _service;", iface.Name)
+	b.blank()
+	b.f("    public %s(%s service) {", cname, iface.Name)
+	b.w("        this._service = service;")
+	b.w("    }")
+	b.blank()
+	b.w("    public String exec(String _json) {")
+	b.w("        ObjectMapper _m = new ObjectMapper();")
+	b.w("        ObjectNode _resp = _m.createObjectNode();")
+	b.w("        JsonNode _r = null;")
+	b.w("        String _id = null;")
+	b.w("        try { _r = _m.readTree(_json); }")
+	b.w("        catch (java.io.IOException _e) { ")
+	b.w("          return rpcErr(_resp,-32700, \"Parse error: \" +_json,_id);")
+	b.w("        }")
+	b.w("        if (_r.has(\"id\")) { _id = _r.get(\"id\").asText(); }")
+	b.w("        if (_r.has(\"method\")) {")
+	b.w("          String _meth = _r.get(\"method\").asText();")
+	b.w("          try {")
+	for i := 0; i < len(iface.Methods); i++ {
+		m := iface.Methods[i]
+		
+		
+		b.raw("            ")
+		if i > 0 {
+			b.raw("else ")
+		}
+		b.f("if (_meth.equals(\"%s_%s\")) {", iface.Name, m.Name)
+		jtype := JavaType(m.ReturnType)
+		params := ""
+		if len(m.Args) > 0 {
+			b.w("              JsonNode _par = _r.get(\"params\");")
+		}
+		for x := 0; x < len(m.Args); x++ {
+			prefix := "_par"
+			if len(m.Args) > 1 {
+				prefix  += fmt.Sprintf(".get(%d)", x)
+			}
+			arg := m.Args[x]
+			if x > 0 {
+				params += ","
+			}
+			argjtype := JavaType(arg.Type)
+			if arg.Type == argjtype {
+				params += fmt.Sprintf("_m.treeToValue(%s, %s.class)", prefix, arg.Type)
+			} else if argjtype == "String" {
+				params += prefix + ".asText()"
+			} else {
+				params += prefix + ".as" + argjtype + "()"
+			}
+		}
+		if m.ReturnType == "" {
+			b.f("              _service.%s(%s);", m.Name, params)
+		} else if m.ReturnType == jtype {
+			b.f("              _resp.put(\"result\", _m.valueToTree(_service.%s(%s)));", m.Name, params)
+		} else {
+			b.f("              _resp.put(\"result\", _service.%s(%s));", m.Name, params)
+		} 
+		b.w("              _resp.put(\"jsonrpc\", \"2.0\");")
+		b.w("              _resp.put(\"id\", _id);")
+		b.w("              return _resp.toString();")
+		b.w("            }")
+	}
+    b.w("            else { return rpcErr(_resp, -32601, \"Method not found: \" + _meth, _id); }")
+	b.w("          }")
+	b.w("          catch (RPCException e) { return rpcErr(_resp, e.getCode(), e.getMessage(), _id); }")
+	b.w("          catch (Throwable t) { return rpcErr(_resp, -32005, \"Unknown error: \" + t.getMessage(), _id); }")
+	b.w("        }")
+	b.w("        else { return rpcErr(_resp, -32600, \"Invalid Request. method missing: \" +_json, _id); }")
+	b.w("    }")
+	b.w(dispatcherRpcErr)
 	b.w("}")
 	return File{JavaFilename(cname), b.b.Bytes()}
 }
 
-func (g JavaGenerator) genServiceRPCClient(p *Package, iface Interface) File {
-	cname := iface.Name + "RPCClient"
+func (g JavaGenerator) genServiceHttpServer(p *Package, iface Interface) File {
+	cname := iface.Name + "HttpServer"
+	b := StartFile(p)
+	b.f("public class %s {", cname)
+	b.blank()
+	b.f("    private %sDispatcher dispatcher;", iface.Name)
+	b.blank()
+	b.f("    public %s(%sDispatcher d) { ", cname, iface.Name)
+	b.w("        this.dispatcher = d;")
+	b.w("    }")
+	b.blank()
+	b.w(httpServerBoilerplate)
+	b.w("}")
+	return File{JavaFilename(cname), b.b.Bytes()}
+}
+
+func (g JavaGenerator) genServiceClient(p *Package, iface Interface) File {
+	cname := iface.Name + "Client"
 	tclass := iface.Name + "Types"
 	b := StartFile(p)
 	b.w("import org.codehaus.jackson.map.ObjectMapper;")
@@ -274,26 +367,25 @@ var rpcClientBoilerplate = `    public interface PolygenProvider {
 
         public String execRPC(String json) throws RPCException {
             try {
-            java.net.URL url = new java.net.URL(_endpointUrl);
-            java.net.URLConnection conn = url.openConnection();
-            conn.setDoOutput(true);
-            java.io.OutputStreamWriter wr = 
-                new java.io.OutputStreamWriter(conn.getOutputStream());
-            wr.write(json);
-            wr.flush();
+                java.net.URL url = new java.net.URL(_endpointUrl);
+                java.net.URLConnection conn = url.openConnection();
+                conn.setDoOutput(true);
+                java.io.OutputStreamWriter wr = 
+                    new java.io.OutputStreamWriter(conn.getOutputStream());
+                wr.write(json);
+                wr.flush();
 
-            // Get the response
-            java.io.BufferedReader rd = 
-                new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = rd.readLine()) != null) {
-                sb.append(line);
-            }
-            wr.close();
-            rd.close();
+                java.io.BufferedReader rd = 
+                    new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = rd.readLine()) != null) {
+                    sb.append(line);
+                }
+                wr.close();
+                rd.close();
 
-            return sb.toString();
+                return sb.toString();
             }
             catch (java.io.IOException e) {
                 throw new RPCException(-32000, e.getMessage());
@@ -342,4 +434,168 @@ var typesBoilerplate = `    public static class BaseReqObj {
         public String getId() { return this.id; }
         public RPCError getError() { return this.error; }
         public String toString() { return json; }
+    }`
+
+var httpServerBoilerplate = `    private java.util.List<Worker> pool;
+
+    public void serve(int port) throws Exception {
+        int count = 0;
+        pool = new java.util.ArrayList<Worker>();
+        java.net.ServerSocket ss = new java.net.ServerSocket(port);
+        while (true) {
+
+            java.net.Socket s = ss.accept();
+
+            Worker w = null;
+            synchronized (pool) {
+                if (pool.isEmpty()) {
+                    Worker ws = new Worker(pool);
+                    ws.setSocket(s);
+                    count++;
+                    Thread t = new Thread(ws, "ServiceHttpWorker-"+count);
+                    t.setDaemon(true);
+                    t.start();
+                } else {
+                    w = pool.remove(0);
+                    w.setSocket(s);
+                }
+            }
+        }
+    }
+
+    class Worker implements Runnable {
+        final byte[] EOL = {(byte)'\r', (byte)'\n' };
+        final String STATUS_OK = "200 OK";
+        final String STATUS_ERR = "500 Internal Server Error";
+
+        java.net.Socket s;
+        java.util.List<Worker> pool;
+        java.util.List<Byte> bytes;
+
+        Worker(java.util.List<Worker> pool) {
+            this.s = null;
+            this.pool = pool;
+            bytes = new java.util.ArrayList<Byte>(2048);
+        }
+
+        synchronized void setSocket(java.net.Socket s) {
+            this.s = s;
+            notify();
+        }
+
+        public synchronized void run() {
+            while (true) {
+                if (s == null) {
+                    try {
+                        wait();
+                    } catch (InterruptedException e) {
+                        continue;
+                    }
+                }
+                try {
+                    handleClient();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                s = null;
+                synchronized (this.pool) {
+                    if (this.pool.size() >= 5) {
+                        return;
+                    } else {
+                        this.pool.add(this);
+                    }
+                }
+            }
+        }
+        
+        void handleClient() throws Exception {
+            java.io.InputStream in = new java.io.BufferedInputStream(s.getInputStream());
+            java.io.PrintStream out = new java.io.PrintStream(s.getOutputStream());
+            s.setSoTimeout(30000);
+            s.setTcpNoDelay(true);
+
+            String status = STATUS_OK;
+            String ctype = "text/plain";
+            String outStr = null;
+            bytes.clear();
+
+            try {
+                StringBuilder sb = new StringBuilder();
+                int r = 0;
+                int b = 0;
+                int lastb = 0;
+                boolean inbody = false;
+                int contentLen = 0;
+                
+                while ((b = in.read()) > -1) {
+                    if (inbody) {
+                        bytes.add((byte)b);
+                        if (bytes.size() == contentLen) {
+                            break;
+                        }
+                    }
+                    else {
+                        if (b == '\n' && lastb == '\r') {
+                            String header = 
+                                new String(toArr(bytes, bytes.size()-1), 
+                                           "utf-8");
+                            if (header.trim().equals("")) {
+                                inbody = true;
+                            }
+                            else if (header.toLowerCase().startsWith("content-length")) {
+                                header = header.toLowerCase();
+                                int start = header.indexOf(":");
+                                contentLen = Integer.parseInt(header.substring(start+1).trim());
+                            }
+                            bytes.clear();
+                        } else {
+                            bytes.add((byte)b);
+                        }
+                    }
+                    lastb = b;
+                }
+                String post = new String(toArr(bytes, bytes.size()), "utf-8");
+
+                System.out.println("Server, got: " + post);
+                outStr = dispatcher.exec(post);
+
+                out.print("HTTP/1.0 ");
+                out.print(status);
+                out.write(EOL);
+                out.print("Content-Length: ");
+                out.print(outStr.length());
+                out.print("Content-Type: ");
+                out.print(ctype);
+                out.write(EOL);
+                out.write(EOL);
+                out.print(outStr);
+                out.flush();
+                s.close();
+
+                System.out.println("Server, sent: " + outStr);
+            } finally {
+                in.close();
+                out.close();
+                s.close();
+            }
+        }
+
+        byte[] toArr(java.util.List<Byte> list, int size) {
+            byte[] arr = new byte[size];
+            for (int i = 0; i < size; i++) {
+                arr[i] = list.get(i);
+            }
+            return arr;
+        }
+
+    }`
+
+var dispatcherRpcErr = `    private String rpcErr(ObjectNode resp, int code, String msg, String id) {
+        resp.put("jsonrpc", "2.0");
+        resp.put("id", id);
+        ObjectNode err = resp.putObject("error");
+        err.put("code", code);
+        err.put("message", msg);
+        return resp.toString();
     }`
