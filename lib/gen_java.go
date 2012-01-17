@@ -191,6 +191,7 @@ func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
 		}
 		if m.ReturnType == "" {
 			b.f("              _service.%s(%s);", m.Name, params)
+			b.f("              _resp.put(\"result\", true);")
 		} else if m.ReturnType == jtype {
 			b.f("              _resp.put(\"result\", _m.valueToTree(_service.%s(%s)));", m.Name, params)
 		} else {
@@ -565,6 +566,7 @@ var httpServerBoilerplate = `    private java.util.List<Worker> pool;
                 out.write(EOL);
                 out.print("Content-Length: ");
                 out.print(outStr.length());
+                out.print(EOL);
                 out.print("Content-Type: ");
                 out.print(ctype);
                 out.write(EOL);
