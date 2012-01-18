@@ -2,6 +2,7 @@ package polygenlib
 
 import (
 	"testing"
+	"os"
 	"os/exec"
 	"io/ioutil"
 )
@@ -29,13 +30,11 @@ func TestJavaGenerator(t *testing.T) {
 		}
 	}
 
-	//dir, err := ioutil.TempDir(os.TempDir(), "test")
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//defer os.RemoveAll(dir)
-
-	dir := "/Users/james/go/src/github.com/coopernurse/polygen/lib/test"
+	dir, err := ioutil.TempDir(os.TempDir(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
 
 	err = WriteFiles(dir, files)
 	if err != nil {
