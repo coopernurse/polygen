@@ -86,7 +86,6 @@ var jsBoilerplate = `    S4 : function() {
                 onError(rpcResp.error);
             }
             else {
-                console.log(JSON.stringify(rpcResp));
                 onSuccess(rpcResp.result);
             }
         });
