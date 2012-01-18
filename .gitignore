@@ -1,3 +1,7 @@
 *.6
 *~
 .DS_Store
+polygen/a.out
+polygen/polygen
+example/java
+example/js
