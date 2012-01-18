@@ -33,18 +33,79 @@ type Interface struct {
 type Method struct {
 	Name string
 	Args []Property
-	ReturnType string // should be something cooler
+	ReturnType PolyType
 }
 
 type Property struct {
 	Name  string
-	Type  string // should be something more sophisticated..
+	Type  PolyType
 }
 
 type Visitor struct { 
 	pkg *Package
 	lastName string
 	state scanState
+	errors []PolyError
+}
+
+func (v *Visitor) AddErr(e *PolyError) {
+	v.errors = append(v.errors, *e)
+}
+
+func (v Visitor) Error() string {
+	err := ""
+	for i := 0; i < len(v.errors); i++ {
+		if i > 0 {
+			err += "\n"
+		}
+		err += v.errors[i].Error()
+	}
+	return err
+}
+
+type PolyType struct {
+	GoType string
+    MapKeyType string
+	IsVoid bool
+	IsMap  bool
+    IsList bool
+}
+
+func NewVoidPolyType() PolyType {
+	return PolyType{"", "", true, false, false}
+}
+
+func NewPolyTypeFromField(f *ast.Field) (PolyType, *PolyError) {
+	switch t := f.Type.(type) {
+	case *ast.MapType:
+		kname := fmt.Sprintf("%v", t.Key)
+		vname := fmt.Sprintf("%v", t.Value)
+		return PolyType{vname, kname, false, true, false}, nil
+	case *ast.ArrayType:
+		tname := fmt.Sprintf("%v", t.Elt)
+		return PolyType{tname, "", false, false, true}, nil
+	case *ast.SliceExpr:
+		tname := fmt.Sprintf("%v", t.X)
+		return PolyType{tname, "", false, false, true}, nil
+	//default:
+	//	fmt.Printf("NewPoly. type: %v\n", t)
+	}
+
+	tname := fmt.Sprintf("%v", f.Type)
+	return PolyType{tname, "", false, false, false}, nil
+}
+
+func NewPolyTypeFromGoType(gotype string) (PolyType, *PolyError) {
+	return PolyType{gotype, "", false, false, false}, nil
+}
+
+type PolyError struct {
+	Line    int
+	Message string
+}
+
+func (e PolyError) Error() string {
+	return fmt.Sprintf("polygen: line: %d err: %s", e.Line, e.Message)
 }
 
 func (v *Visitor) Visit(n ast.Node) ast.Visitor {
@@ -70,14 +131,23 @@ func (v *Visitor) Visit(n ast.Node) ast.Visitor {
 					meth.Args = []Property{}
 					for x := 0; x < len(fields); x++ {
 						if len(fields[x].Names) > 0 {
-							tname := fmt.Sprintf("%v", fields[x].Type)
-							prop := Property{fields[x].Names[0].Name, tname}
-							meth.Args = append(meth.Args, prop)
+							ptype, err := NewPolyTypeFromField(fields[x])
+							if err == nil {
+								prop := Property{fields[x].Names[0].Name, ptype}
+								meth.Args = append(meth.Args, prop)
+							} else {
+								v.AddErr(err)
+							}
 						}
 					}
 				} else {
 					if len(fields) > 0 {
-						meth.ReturnType = fmt.Sprintf("%v", fields[0].Type)
+						rtype, err := NewPolyTypeFromField(fields[0])
+						if err == nil {
+							meth.ReturnType = rtype
+						} else {
+							v.AddErr(err)
+						}
 					}
 				}
 				
@@ -89,14 +159,18 @@ func (v *Visitor) Visit(n ast.Node) ast.Visitor {
 		case STRUCT:
 			if len(t.Names) > 0 {
 				tmp := &v.pkg.Structs[len(v.pkg.Structs)-1]
-				tname := fmt.Sprintf("%v", t.Type)
-				tmp.Props = append(tmp.Props, Property{t.Names[0].Name, tname})
+				ptype, err := NewPolyTypeFromField(t)
+				if err == nil {
+					tmp.Props = append(tmp.Props, Property{t.Names[0].Name, ptype})
+				} else {
+					v.AddErr(err)
+				}
 				return nil
 			}
 		case INTERFACE:
 			if len(t.Names) > 0 {
 				tmp := &v.pkg.Interfaces[len(v.pkg.Interfaces)-1]
-				m := Method{t.Names[0].Name, nil, ""}
+				m := Method{t.Names[0].Name, nil, NewVoidPolyType()}
 				tmp.Methods = append(tmp.Methods, m)
 			}
 
@@ -119,12 +193,15 @@ func Parse(code string) (*Package, error) {
 	//fmt.Printf("err=%v\n", err)
 	//fmt.Printf("ast=%v\n", af)
 
-	v := &Visitor{&Package{}, "", STRUCT}
+	v := &Visitor{&Package{}, "", STRUCT, make([]PolyError,0)}
 	v.pkg.Name = af.Name.Name
 	v.pkg.Structs = []Struct{}
 	v.pkg.Interfaces = []Interface{}
 	ast.Walk(v, af)
 
+	if len(v.errors) > 0 {
+		return nil, v
+	}
 	return v.pkg, nil
 }
 

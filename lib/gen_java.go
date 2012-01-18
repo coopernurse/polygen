@@ -32,8 +32,8 @@ func JavaFilename(s string) string {
 	return s + ".java"
 }
 
-func JavaType(s string) string {
-	switch s {
+func ScalarJavaType(t string) string {
+	switch t {
 	case "int":
 		return "Long"
 	case "float":
@@ -46,7 +46,18 @@ func JavaType(s string) string {
 		return "void"
 	}
 
-	return s
+	return t
+}
+
+func JavaType(t PolyType) string {
+	if t.IsMap {
+		return fmt.Sprintf("java.util.Map<%s,%s>", 
+			ScalarJavaType(t.MapKeyType), ScalarJavaType(t.GoType))
+	} else if t.IsList {
+		return fmt.Sprintf("java.util.List<%s>", ScalarJavaType(t.GoType))
+	}
+
+	return ScalarJavaType(t.GoType)
 }
 
 func JavaName(s string) string {
@@ -57,7 +68,13 @@ func VarName(s string) string {
 	return strings.ToLower(s)
 }
 
-func ServiceResponseType(t string) string {
+func ServiceResponseType(t PolyType) string {
+	if t.IsMap {
+		return "Map" + ScalarJavaType(t.MapKeyType) + ScalarJavaType(t.GoType) +
+			"TypeRespObj"
+	} else if t.IsList {
+		return "List" + ScalarJavaType(t.GoType)
+	}
 	return JavaType(t) + "TypeRespObj"
 }
 
@@ -166,7 +183,8 @@ func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
 			b.raw("else ")
 		}
 		b.f("if (_meth.equals(\"%s_%s\")) {", iface.Name, m.Name)
-		jtype := JavaType(m.ReturnType)
+		rtype := m.ReturnType
+		jtype := JavaType(rtype)
 		params := ""
 		if len(m.Args) > 0 {
 			b.w("              JsonNode _par = _r.get(\"params\");")
@@ -181,18 +199,20 @@ func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
 				params += ","
 			}
 			argjtype := JavaType(arg.Type)
-			if arg.Type == argjtype {
-				params += fmt.Sprintf("_m.treeToValue(%s, %s.class)", prefix, arg.Type)
+			if arg.Type.IsMap || arg.Type.IsList {
+				params += fmt.Sprintf("(%s)_m.readValue(%s, new org.codehaus.jackson.type.TypeReference<%s>() { })", argjtype, prefix, argjtype)
+			} else if arg.Type.GoType == argjtype {
+				params += fmt.Sprintf("_m.treeToValue(%s, %s.class)", prefix, argjtype)
 			} else if argjtype == "String" {
 				params += prefix + ".asText()"
 			} else {
 				params += prefix + ".as" + argjtype + "()"
 			}
 		}
-		if m.ReturnType == "" {
+		if rtype.IsVoid {
 			b.f("              _service.%s(%s);", m.Name, params)
 			b.f("              _resp.put(\"result\", true);")
-		} else if m.ReturnType == jtype {
+		} else if rtype.GoType == jtype || rtype.IsMap || rtype.IsList {
 			b.f("              _resp.put(\"result\", _m.valueToTree(_service.%s(%s)));", m.Name, params)
 		} else {
 			b.f("              _resp.put(\"result\", _service.%s(%s));", m.Name, params)
@@ -263,7 +283,7 @@ func (g JavaGenerator) genServiceClient(p *Package, iface Interface) File {
 		b.w("        ObjectMapper _m = new ObjectMapper();")
 		b.w("        try {")
 		b.w("            String _j = _prv.execRPC(_m.writeValueAsString(_rq));")
-		if m.ReturnType == "" {
+		if m.ReturnType.IsVoid {
 			b.f("          %s.BaseRespObj _resp = ", tclass)
             b.f("            new %s.BaseRespObj(_m, _j);", tclass)
             b.w("          if (_resp.getError() != null) ")
@@ -295,17 +315,20 @@ func (g JavaGenerator) genServiceTypes(p *Package, iface Interface) File {
 	b.blank()
 	for i := 0; i < len(iface.Methods); i++ {
 		rtype := iface.Methods[i].ReturnType
-		if rtype != "" {
-			if _, ok := retTypes[rtype]; !ok {
-				retTypes[rtype] = true
-				jtype := JavaType(rtype)
+		if !rtype.IsVoid {
+			jtype := JavaType(rtype)
+			resptype := ServiceResponseType(rtype)
+			if _, ok := retTypes[resptype]; !ok {
+				retTypes[resptype] = true
 			
-				b.f("    public static class %sTypeRespObj extends BaseRespObj {", jtype)
+				b.f("    public static class %s extends BaseRespObj {", resptype)
 				b.f("        %s result;", jtype)
-				b.f("        public %sTypeRespObj(ObjectMapper m, String j) throws java.io.IOException {", jtype)
+				b.f("        public %s(ObjectMapper m, String j) throws java.io.IOException {", resptype)
 				b.w("            super(m, j);")
 				b.w("            if (root.has(\"result\"))")
-				if jtype == rtype {
+				if rtype.IsList || rtype.IsMap {
+					b.f("                result = m.readValue(root.get(\"result\"), new org.codehaus.jackson.type.TypeReference<%s>() { });", jtype)
+				} else if jtype == rtype.GoType {
 					// custom object, not a built in java type
 					b.f("                result = m.treeToValue(root.get(\"result\"), %s.class);", jtype)
 				} else if jtype == "String" {

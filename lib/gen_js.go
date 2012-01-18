@@ -27,10 +27,10 @@ func (g JsGenerator) GenFiles(p *Package) []File {
 			m := iface.Methods[x]
 			if len(m.Args) == 0 {
 				b.f("        _me.%s = function(_onSuccess, _onError) {", m.Name)
-				b.w("            var args = null;")
+				b.w("            var _args = null;")
 			} else if len(m.Args) == 1 {
 				b.f("        _me.%s = function(%s, _onSuccess, _onError) {", m.Name, m.Args[0].Name)
-				b.f("            var args = %s;", m.Args[0].Name)
+				b.f("            var _args = %s;", m.Args[0].Name)
 			} else {
 				args := ""
 				for y := 0; y < len(m.Args); y++ {
@@ -40,9 +40,9 @@ func (g JsGenerator) GenFiles(p *Package) []File {
 					args += m.Args[y].Name
 				}
 				b.f("        _me.%s = function(%s, _onSuccess, _onError) {", m.Name, args)
-				b.f("            var args = [ %s ];", args)
+				b.f("            var _args = [ %s ];", args)
 			}
-			b.f("            %s.rpcCall(_uri, \"%s_%s\", args, _onSuccess, _onError);", p.Name, iface.Name, m.Name)
+			b.f("            %s.rpcCall(_uri, \"%s_%s\", _args, _onSuccess, _onError);", p.Name, iface.Name, m.Name)
 			b.w("        };")
 		}
 		b.w("        return _me;")

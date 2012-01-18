@@ -36,6 +36,8 @@ func TestJavaGenerator(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	//dir := "/Users/james/go/src/github.com/coopernurse/polygen/lib/test"
+
 	err = WriteFiles(dir, files)
 	if err != nil {
 		t.Fatal(err)

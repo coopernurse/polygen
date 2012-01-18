@@ -7,12 +7,6 @@ import (
 
 var example1 = `package foolib
 
-type JobTitle string
-const (
-    BOSS JobTitle = "Boss"
-    WORKER = "Worker"
-)
-
 type Result struct {
 	Success	bool
 	Code	int
@@ -21,9 +15,10 @@ type Result struct {
 
 type Person struct {
 	Id int
-	Name string
-	Email string "pattern: \\S+@\\S+.\\S+"
-	Title string
+	name string
+	email string "pattern: \\S+@\\S+.\\S+"
+	title string
+    age float
 }
 
 type SampleService interface {
@@ -31,57 +26,59 @@ type SampleService interface {
 	Add(a int, b int) int
     StoreName(name string)
     Say_Hi() string
+    getPeople(params map[string] string) []Person
 }`
 
-func TestExample(t *testing.T) {
+func TestParseExample(t *testing.T) {
 	pkg, err := Parse(example1)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	intType := PolyType{"int", "", false, false, false}
+	floatType := PolyType{"float", "", false, false, false}
+	stringType := PolyType{"string", "", false, false, false}
+	boolType := PolyType{"bool", "", false, false, false}
+	personType := PolyType{"Person", "", false, false, false}
+	resultType := PolyType{"Result", "", false, false, false}
+
 	structs := []Struct{
 		Struct{"Result", []Property{
-				Property{"Success", "bool"},
-				Property{"Code", "int"},
-				Property{"Note", "string"},
+				Property{"Success", boolType},
+				Property{"Code", intType},
+				Property{"Note", stringType},
 		}},
 		Struct{"Person", []Property{
-				Property{"Id", "int"},
-				Property{"Name", "string"},
-				Property{"Email", "string"},
-				Property{"Title", "string"},
+				Property{"Id", intType},
+				Property{"name", stringType},
+				Property{"email", stringType},
+				Property{"title", stringType},
+				Property{"age", floatType},
 		}},
 	}
 	ifaces := []Interface{
 		Interface{"SampleService", []Method{
-				Method{"Create", []Property{
-						Property{"p", "Person"},
-					}, "Result"},
-				Method{"Add", []Property{
-						Property{"a", "int"},
-						Property{"b", "int"},
-					}, "int"},
-				Method{"StoreName", []Property{
-						Property{"name", "string"}}, ""},
-				Method{"Say_Hi", []Property{}, "string"},
+				Method{"Create", []Property{Property{"p", personType}},
+					resultType},
+				Method{"Add", []Property{Property{"a", intType}, 
+						Property{"b", intType},}, intType},
+				Method{"StoreName", []Property{Property{"name", stringType}},
+					NewVoidPolyType()},
+				Method{"Say_Hi", []Property{}, stringType},
+				Method{"getPeople", []Property{
+						Property{"params", 
+							PolyType{"string", "string", false, true, false}},
+					}, PolyType{"Person", "", false, false, true}},
 		}},
 	}
 	expected := Package{"foolib", structs, ifaces}
+	if !reflect.DeepEqual(expected.Structs, pkg.Structs) {
+		t.Errorf("%v != %v", expected.Structs, pkg.Structs)
+	}
 	if !reflect.DeepEqual(expected.Interfaces, pkg.Interfaces) {
 		t.Errorf("%v != %v", expected.Interfaces, pkg.Interfaces)
 	}
-}
-
-// JSON Schema generation
-//   
-
-// Java generation
-//
-//  create a .java file per struct
-//  create two .java files per interface:
-//    - java interface 
-//    - java json-rpc server class, which dispatches to an impl of interface,
-//        but also validates inputs against the schema
-//    - java json-rpc client class, which makes requests to server
+}   
 
 // To try:
 //    map[string] Foo
@@ -90,6 +87,8 @@ func TestExample(t *testing.T) {
 // Validation tests
 //
 // Disallow func 
+// Disallow var
+// Disallow const
 // Disallow types that are not int/float/string/bool or in file
 // Disallow multiple return values on interface methods
 // Disallow variadics
