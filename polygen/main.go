@@ -68,6 +68,7 @@ func main() {
 	generators := make(map[string]polygen.CodeGenerator)
 	generators["java"] = polygen.JavaGenerator{}
 	generators["js"] = polygen.JsGenerator{}
+	generators["node"] = polygen.NodeJsGenerator{}
 
 	for subdir, gen := range(generators) {
 		dest := filepath.Join(dir, subdir)
