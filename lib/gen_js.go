@@ -125,7 +125,7 @@ var nodePostBoilerplate = `    post : function(urlInfo, obj, callback) {
             res.on('end', function(){
             
                 // fire callback
-                callback(res.body, res);
+                callback(JSON.parse(res.body));
             });
         });
         req.end();

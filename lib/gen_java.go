@@ -589,7 +589,7 @@ var httpServerBoilerplate = `    private java.util.List<Worker> pool;
                 out.write(EOL);
                 out.print("Content-Length: ");
                 out.print(outStr.length());
-                out.print(EOL);
+                out.write(EOL);
                 out.print("Content-Type: ");
                 out.print(ctype);
                 out.write(EOL);
