@@ -30,7 +30,7 @@ var callback = function(res) {
 };
 
 // uncomment to run client benchmark
-//doAdd(callback);
+doAdd(callback);
 
 svc.Add(2, 15, function(res) {
     console.log("Add Result: " + res);
