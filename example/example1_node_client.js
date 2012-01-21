@@ -8,10 +8,17 @@ var foolib = require('./node/foolib-node');
 
 var svc = foolib.SampleServiceClient("http://localhost:9009");
 
-/*
+var errHandler = function(res) {
+    console.log("ERR: code=" + res.code + " msg=" + res.message);
+};
+
+var doAdd = function(callback) {
+    svc.Add(3, 31, callback, errHandler);
+};
+
 var start = new Date().getTime();
 var count = 10000;
-var callback = function(body, res) {
+var callback = function(res) {
     count--;
     if (count > 0) {
         doAdd(callback);
@@ -21,12 +28,9 @@ var callback = function(body, res) {
         console.log("Elapsed: " + elapsed);
     }
 };
-doAdd(callback);
-*/
 
-var errHandler = function(res) {
-    console.log("ERR: code=" + res.code + " msg=" + res.message);
-};
+// uncomment to run client benchmark
+//doAdd(callback);
 
 svc.Add(2, 15, function(res) {
     console.log("Add Result: " + res);
