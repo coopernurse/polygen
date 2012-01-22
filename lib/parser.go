@@ -42,14 +42,26 @@ type Property struct {
 }
 
 type Visitor struct { 
+	filename string
 	pkg *Package
 	lastName string
 	state scanState
 	errors []PolyError
+	fs *token.FileSet
 }
 
 func (v *Visitor) AddErr(e *PolyError) {
+	e.Filename = v.filename
 	v.errors = append(v.errors, *e)
+}
+
+func (v *Visitor) Validate() {
+	for i := 0; i < len(v.pkg.Interfaces); i++ {
+		iface := v.pkg.Interfaces[i]
+		if len(iface.Methods) == 0 {
+			v.AddErr(&PolyError{Line:0, Message: "Interface " + iface.Name + " has zero methods"})
+		}
+	}
 }
 
 func (v Visitor) Error() string {
@@ -75,20 +87,42 @@ func NewVoidPolyType() PolyType {
 	return PolyType{"", "", true, false, false}
 }
 
-func NewPolyTypeFromField(f *ast.Field) (PolyType, *PolyError) {
+func NewPolyTypeFromField(v *Visitor, f *ast.Field) (PolyType, *PolyError) {
 	switch t := f.Type.(type) {
 	case *ast.MapType:
 		kname := fmt.Sprintf("%v", t.Key)
 		vname := fmt.Sprintf("%v", t.Value)
-		return PolyType{vname, kname, false, true, false}, nil
+		if kname == "string" {
+			if _, ok := t.Value.(*ast.MapType); ok {
+				line := v.fs.Position(f.Pos()).Line
+				return PolyType{}, &PolyError{Line: line, Message: "Maps may not be nested"}
+			} else {
+				return PolyType{vname, kname, false, true, false}, nil
+			}
+		} else {
+			line := v.fs.Position(f.Pos()).Line
+			return PolyType{}, &PolyError{Line: line, Message: "Map keys must be type string (not " + kname + ")"}
+		}
 	case *ast.ArrayType:
 		tname := fmt.Sprintf("%v", t.Elt)
 		return PolyType{tname, "", false, false, true}, nil
 	case *ast.SliceExpr:
 		tname := fmt.Sprintf("%v", t.X)
 		return PolyType{tname, "", false, false, true}, nil
-	//default:
-	//	fmt.Printf("NewPoly. type: %v\n", t)
+	default:
+		stype := fmt.Sprintf("%v", t)
+		switch stype {
+		case "int8","int16","int32","int64","uint8","uint16","uint32","uint64",
+			"float32","float64","complex64","complex128","byte","uint","uintptr":
+			line := v.fs.Position(f.Pos()).Line
+			return PolyType{}, &PolyError{Line: line, Message: "Illegal type: " + stype}
+		default:
+			if _, ok := t.(*ast.Ellipsis); ok {
+				line := v.fs.Position(f.Pos()).Line
+				return PolyType{}, &PolyError{Line: line, Message: "Variadics are not allowed. Use [] instead"}
+			}
+		}
+		//fmt.Printf("NewPoly. type: %v\n", reflect.TypeOf(t))
 	}
 
 	tname := fmt.Sprintf("%v", f.Type)
@@ -100,12 +134,13 @@ func NewPolyTypeFromGoType(gotype string) (PolyType, *PolyError) {
 }
 
 type PolyError struct {
+	Filename string
 	Line    int
 	Message string
 }
 
 func (e PolyError) Error() string {
-	return fmt.Sprintf("polygen: line: %d err: %s", e.Line, e.Message)
+	return fmt.Sprintf("%s:%d: %s", e.Filename, e.Line, e.Message)
 }
 
 func (v *Visitor) Visit(n ast.Node) ast.Visitor {
@@ -131,22 +166,31 @@ func (v *Visitor) Visit(n ast.Node) ast.Visitor {
 					meth.Args = []Property{}
 					for x := 0; x < len(fields); x++ {
 						if len(fields[x].Names) > 0 {
-							ptype, err := NewPolyTypeFromField(fields[x])
+							ptype, err := NewPolyTypeFromField(v, fields[x])
 							if err == nil {
-								prop := Property{fields[x].Names[0].Name, ptype}
+								fname := fields[x].Names[0].Name
+								prop := Property{fname, ptype}
 								meth.Args = append(meth.Args, prop)
 							} else {
 								v.AddErr(err)
 							}
+						} else {
+							line := v.fs.Position(n.Pos()).Line
+							v.AddErr(&PolyError{Line: line, Message: "Method arguments must have variable names"})
 						}
 					}
 				} else {
 					if len(fields) > 0 {
-						rtype, err := NewPolyTypeFromField(fields[0])
-						if err == nil {
-							meth.ReturnType = rtype
+						if len(fields) > 1 {
+							line := v.fs.Position(n.Pos()).Line
+							v.AddErr(&PolyError{Line: line, Message: "Methods may only return one value"})
 						} else {
-							v.AddErr(err)
+							rtype, err := NewPolyTypeFromField(v, fields[0])
+							if err == nil {
+								meth.ReturnType = rtype
+							} else {
+								v.AddErr(err)
+							}
 						}
 					}
 				}
@@ -159,7 +203,7 @@ func (v *Visitor) Visit(n ast.Node) ast.Visitor {
 		case STRUCT:
 			if len(t.Names) > 0 {
 				tmp := &v.pkg.Structs[len(v.pkg.Structs)-1]
-				ptype, err := NewPolyTypeFromField(t)
+				ptype, err := NewPolyTypeFromField(v, t)
 				if err == nil {
 					tmp.Props = append(tmp.Props, Property{t.Names[0].Name, ptype})
 				} else {
@@ -175,17 +219,29 @@ func (v *Visitor) Visit(n ast.Node) ast.Visitor {
 			}
 
 		}
+	case *ast.ImportSpec:
+		line := v.fs.Position(n.Pos()).Line
+		v.AddErr(&PolyError{Line: line, Message: "'import' is not allowed"})
+	case *ast.ValueSpec:
+		line := v.fs.Position(n.Pos()).Line
+		v.AddErr(&PolyError{Line: line, Message: "Values are not allowed"})
+	case *ast.FuncType:
+		if v.state != INTERFACE {
+			line := v.fs.Position(n.Pos()).Line
+			v.AddErr(&PolyError{Line: line, Message: "Functions are not allowed"})
+		}
 	}
 	return v
 }
 
-func Parse(code string) (*Package, error) {
+func Parse(fname string, code string) (*Package, error) {
 	//lines = strings.Split(code, "\n")
 	//for i := 0; i < len(lines); i++ {
 	//	f.AddLine(i+1, 
 	//}
 	fs := &token.FileSet{}
-	af, err := parser.ParseFile(fs, "myfile.go", code, 0)
+	fs.AddFile(fname, 0, len(code))
+	af, err := parser.ParseFile(fs, fname, code, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -193,11 +249,13 @@ func Parse(code string) (*Package, error) {
 	//fmt.Printf("err=%v\n", err)
 	//fmt.Printf("ast=%v\n", af)
 
-	v := &Visitor{&Package{}, "", STRUCT, make([]PolyError,0)}
+	v := &Visitor{fname, &Package{}, "", STRUCT, make([]PolyError,0), fs}
 	v.pkg.Name = af.Name.Name
 	v.pkg.Structs = []Struct{}
 	v.pkg.Interfaces = []Interface{}
 	ast.Walk(v, af)
+
+	v.Validate()
 
 	if len(v.errors) > 0 {
 		return nil, v

@@ -8,7 +8,7 @@ import (
 )
 
 func TestJavaGenerator(t *testing.T) {
-	pkg, err := Parse(example1)
+	pkg, err := Parse("java_test.go", example1)
 	if err != nil {
 		t.Fatal(err)
 	}

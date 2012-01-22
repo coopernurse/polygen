@@ -1,6 +1,7 @@
 package polygenlib
 
 import (
+	"strings"
 	"testing"
 	"reflect"
 )
@@ -30,7 +31,7 @@ type SampleService interface {
 }`
 
 func TestParseExample(t *testing.T) {
-	pkg, err := Parse(example1)
+	pkg, err := Parse("test.go", example1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,17 +81,59 @@ func TestParseExample(t *testing.T) {
 	}
 }   
 
-// To try:
-//    map[string] Foo
-//    map[int] []Foo
-
 // Validation tests
 //
-// Disallow func 
-// Disallow var
-// Disallow const
-// Disallow types that are not int/float/string/bool or in file
-// Disallow multiple return values on interface methods
-// Disallow variadics
-// Disallow nested maps
-// Disallow interface args without names
+// Verify filename in output is correct
+
+func TestErrFilename(t *testing.T) {
+	idl := "package foo\nvar blah"
+	pkg, err := Parse("example1.go", idl)
+	if err == nil {
+		t.Error("expected err")
+	}
+	if pkg != nil {
+		t.Error("pkg should be nil")
+	}
+	if strings.Index(err.Error(), "example1.go:") != 0 {
+		t.Errorf("err didn't start with example1.go: - %s", err.Error())
+	}
+}
+
+// Verify line number in error output is correct
+func TestErrLineNum(t *testing.T) {
+	idl := "package foo\nimport (\"fmt\")"
+	_, err := Parse("example1.go", idl)
+	if err == nil {
+		t.Fatal("expected err")
+	}
+	if strings.Index(err.Error(), "example1.go:2") != 0 {
+		t.Errorf("err didn't start with example1.go:2: - %s", err.Error())
+	}
+}
+
+var illegalIdl = []string{
+	"const huge = 1 << 100\ntype foo struct {\n foo huge\n}",
+	"func foo() int { return 1 }",
+	"var foo string\n",
+	"type foo interface { }",
+	"type foo struct {\n a int64\n}",
+	"type foo struct {\n a uint64\n}",
+	"type foo struct {\n a float64\n}",
+	"type foo struct {\n a map[int] string\n}",
+	"type foo struct {\n a map[string] map[string] int\n}",
+	"type foo interface {\n doSomething() (int, int)\n}",
+	"type foo interface {\n doSomething(int, int) int\n}",
+	"type foo interface {\n doSomething(foo ...int) int\n}",
+}
+
+func TestIllegalIdl(t *testing.T) {
+	for _, s := range(illegalIdl) {
+		s = "package foopkg\n" + s
+		_, err := Parse("example1.go", s)
+		//fmt.Printf("err=%v\n", err)
+		if err == nil {
+			t.Errorf("expected err for: %s", s)
+		}
+	}
+}
+

@@ -60,7 +60,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pkg, err := polygen.Parse(string(idl))
+	pkg, err := polygen.Parse(fname, string(idl))
 	if err != nil {
 		log.Fatal(err)
 	}	

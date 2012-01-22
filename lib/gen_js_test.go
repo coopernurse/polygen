@@ -7,7 +7,7 @@ import (
 )
 
 func TestJsGenerator(t *testing.T) {
-	pkg, err := Parse(example1)
+	pkg, err := Parse("test.go", example1)
 	if err != nil {
 		t.Fatal(err)
 	}
