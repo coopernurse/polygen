@@ -1,9 +1,9 @@
 package polygenlib
 
 import (
-	"testing"
-	"os"
 	"io/ioutil"
+	"os"
+	"testing"
 )
 
 func TestJsGenerator(t *testing.T) {
@@ -11,7 +11,7 @@ func TestJsGenerator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	gen := JsGenerator{}
 	files := gen.GenFiles(pkg)
 

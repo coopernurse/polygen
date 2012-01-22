@@ -14,7 +14,7 @@ func JsFilename(pkg string) string {
 	return pkg + ".js"
 }
 
-type JsGenerator struct { }
+type JsGenerator struct{}
 
 func (g JsGenerator) GenFiles(p *Package) []File {
 	b := StartJsFile(p)
@@ -32,10 +32,10 @@ func (g JsGenerator) GenFiles(p *Package) []File {
 	}
 	b.w("};")
 	file := File{JsFilename(p.Name), b.b.Bytes()}
-	return []File{ file }
+	return []File{file}
 }
 
-type NodeJsGenerator struct { }
+type NodeJsGenerator struct{}
 
 func (g NodeJsGenerator) GenFiles(p *Package) []File {
 	b := StartJsFile(p)
@@ -102,13 +102,13 @@ func (g NodeJsGenerator) GenFiles(p *Package) []File {
 	}
 
 	file := File{JsFilename(p.Name + "-node"), b.b.Bytes()}
-	return []File{ file }
+	return []File{file}
 }
 
 func GenJsClientFunc(iface Interface, b *StrBuf, utilname string) {
 	b.w("        var _me = {};")
-    b.w("        var _tmp = _urlmod.parse(_url);")
-    b.w("        _url = { 'host': _tmp.hostname, 'port': _tmp.port, 'path': _tmp.pathname, 'protocol': _tmp.protocol };")
+	b.w("        var _tmp = _urlmod.parse(_url);")
+	b.w("        _url = { 'host': _tmp.hostname, 'port': _tmp.port, 'path': _tmp.pathname, 'protocol': _tmp.protocol };")
 	for x := 0; x < len(iface.Methods); x++ {
 		m := iface.Methods[x]
 		if len(m.Args) == 0 {

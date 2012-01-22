@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	polygen "github.com/coopernurse/polygen/lib"
+	"io/ioutil"
 	"log"
 	"os"
-	"io/ioutil"
 	"path/filepath"
-	polygen "github.com/coopernurse/polygen/lib"
 )
 
 func generate(p *polygen.Package, g polygen.CodeGenerator, dir string) error {
@@ -63,14 +63,14 @@ func main() {
 	pkg, err := polygen.Parse(fname, string(idl))
 	if err != nil {
 		log.Fatal(err)
-	}	
+	}
 
 	generators := make(map[string]polygen.CodeGenerator)
 	generators["java"] = polygen.JavaGenerator{}
 	generators["js"] = polygen.JsGenerator{}
 	generators["node"] = polygen.NodeJsGenerator{}
 
-	for subdir, gen := range(generators) {
+	for subdir, gen := range generators {
 		dest := filepath.Join(dir, subdir)
 		if clean {
 			log.Printf("Cleaning: %s", dest)

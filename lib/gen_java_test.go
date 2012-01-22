@@ -1,10 +1,10 @@
 package polygenlib
 
 import (
-	"testing"
+	"io/ioutil"
 	"os"
 	"os/exec"
-	"io/ioutil"
+	"testing"
 )
 
 func TestJavaGenerator(t *testing.T) {
@@ -12,10 +12,10 @@ func TestJavaGenerator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	gen := JavaGenerator{}
 	files := gen.GenFiles(pkg)
-	names := []string{"RPCException.java", "RPCError.java", 
+	names := []string{"RPCException.java", "RPCError.java",
 		"Result.java", "Person.java",
 		"SampleService.java", "SampleServiceDispatcher.java",
 		"SampleServiceHttpServer.java",

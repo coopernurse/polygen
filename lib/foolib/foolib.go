@@ -1,6 +1,8 @@
 package foolib
 
+// Result is a thing that does something
 type Result struct {
+	// 
 	Success bool
 	Code    int
 	Note    string
@@ -8,10 +10,9 @@ type Result struct {
 
 type Person struct {
 	Id    int
-	name  string
-	email string "pattern: \\S+@\\S+.\\S+"
-	title string
-	age   float
+	Name  string
+	Email string "pattern: \\S+@\\S+.\\S+"
+	Title string
 }
 
 type SampleService interface {
@@ -19,5 +20,4 @@ type SampleService interface {
 	Add(a int, b int) int
 	StoreName(name string)
 	Say_Hi() string
-	getPeople(params map[string]string) []Person
 }

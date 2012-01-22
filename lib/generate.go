@@ -1,10 +1,10 @@
 package polygenlib
 
 import (
-	"os"
+	"bytes"
 	"errors"
 	"fmt"
-	"bytes"
+	"os"
 	"time"
 )
 
@@ -13,7 +13,7 @@ type CodeGenerator interface {
 }
 
 type File struct {
-	Name string
+	Name     string
 	Contents []byte
 }
 
@@ -33,8 +33,8 @@ func (f File) WriteTo(dir string) error {
 }
 
 type StrBuf struct {
-    commentDelim string
-	b *bytes.Buffer
+	commentDelim string
+	b            *bytes.Buffer
 }
 
 func (sb StrBuf) prelude() {
@@ -91,4 +91,3 @@ func WriteFiles(dir string, files []File) error {
 
 	return nil
 }
-

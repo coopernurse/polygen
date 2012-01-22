@@ -8,6 +8,7 @@ import (
 )
 
 type scanState int
+
 const (
 	STRUCT scanState = iota
 	INTERFACE
@@ -15,39 +16,39 @@ const (
 )
 
 type Package struct {
-	Name string
-	Structs  []Struct
+	Name       string
+	Structs    []Struct
 	Interfaces []Interface
 }
 
 type Struct struct {
-	Name string
+	Name  string
 	Props []Property
 }
 
 type Interface struct {
-	Name string
+	Name    string
 	Methods []Method
 }
 
 type Method struct {
-	Name string
-	Args []Property
+	Name       string
+	Args       []Property
 	ReturnType PolyType
 }
 
 type Property struct {
-	Name  string
-	Type  PolyType
+	Name string
+	Type PolyType
 }
 
-type Visitor struct { 
+type Visitor struct {
 	filename string
-	pkg *Package
+	pkg      *Package
 	lastName string
-	state scanState
-	errors []PolyError
-	fs *token.FileSet
+	state    scanState
+	errors   []PolyError
+	fs       *token.FileSet
 }
 
 func (v *Visitor) AddErr(e *PolyError) {
@@ -59,7 +60,7 @@ func (v *Visitor) Validate() {
 	for i := 0; i < len(v.pkg.Interfaces); i++ {
 		iface := v.pkg.Interfaces[i]
 		if len(iface.Methods) == 0 {
-			v.AddErr(&PolyError{Line:0, Message: "Interface " + iface.Name + " has zero methods"})
+			v.AddErr(&PolyError{Line: 0, Message: "Interface " + iface.Name + " has zero methods"})
 		}
 	}
 }
@@ -76,11 +77,11 @@ func (v Visitor) Error() string {
 }
 
 type PolyType struct {
-	GoType string
-    MapKeyType string
-	IsVoid bool
-	IsMap  bool
-    IsList bool
+	GoType     string
+	MapKeyType string
+	IsVoid     bool
+	IsMap      bool
+	IsList     bool
 }
 
 func NewVoidPolyType() PolyType {
@@ -112,8 +113,8 @@ func NewPolyTypeFromField(v *Visitor, f *ast.Field) (PolyType, *PolyError) {
 	default:
 		stype := fmt.Sprintf("%v", t)
 		switch stype {
-		case "int8","int16","int32","int64","uint8","uint16","uint32","uint64",
-			"float32","float64","complex64","complex128","byte","uint","uintptr":
+		case "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64",
+			"float32", "float64", "complex64", "complex128", "byte", "uint", "uintptr":
 			line := v.fs.Position(f.Pos()).Line
 			return PolyType{}, &PolyError{Line: line, Message: "Illegal type: " + stype}
 		default:
@@ -135,8 +136,8 @@ func NewPolyTypeFromGoType(gotype string) (PolyType, *PolyError) {
 
 type PolyError struct {
 	Filename string
-	Line    int
-	Message string
+	Line     int
+	Message  string
 }
 
 func (e PolyError) Error() string {
@@ -194,7 +195,7 @@ func (v *Visitor) Visit(n ast.Node) ast.Visitor {
 						}
 					}
 				}
-				
+
 				return nil
 			}
 		}
@@ -249,7 +250,7 @@ func Parse(fname string, code string) (*Package, error) {
 	//fmt.Printf("err=%v\n", err)
 	//fmt.Printf("ast=%v\n", af)
 
-	v := &Visitor{fname, &Package{}, "", STRUCT, make([]PolyError,0), fs}
+	v := &Visitor{fname, &Package{}, "", STRUCT, make([]PolyError, 0), fs}
 	v.pkg.Name = af.Name.Name
 	v.pkg.Structs = []Struct{}
 	v.pkg.Interfaces = []Interface{}
@@ -262,4 +263,3 @@ func Parse(fname string, code string) (*Package, error) {
 	}
 	return v.pkg, nil
 }
-

@@ -1,9 +1,9 @@
 package polygenlib
 
 import (
+	"reflect"
 	"strings"
 	"testing"
-	"reflect"
 )
 
 var example1 = `package foolib
@@ -45,31 +45,31 @@ func TestParseExample(t *testing.T) {
 
 	structs := []Struct{
 		Struct{"Result", []Property{
-				Property{"Success", boolType},
-				Property{"Code", intType},
-				Property{"Note", stringType},
+			Property{"Success", boolType},
+			Property{"Code", intType},
+			Property{"Note", stringType},
 		}},
 		Struct{"Person", []Property{
-				Property{"Id", intType},
-				Property{"name", stringType},
-				Property{"email", stringType},
-				Property{"title", stringType},
-				Property{"age", floatType},
+			Property{"Id", intType},
+			Property{"name", stringType},
+			Property{"email", stringType},
+			Property{"title", stringType},
+			Property{"age", floatType},
 		}},
 	}
 	ifaces := []Interface{
 		Interface{"SampleService", []Method{
-				Method{"Create", []Property{Property{"p", personType}},
-					resultType},
-				Method{"Add", []Property{Property{"a", intType}, 
-						Property{"b", intType},}, intType},
-				Method{"StoreName", []Property{Property{"name", stringType}},
-					NewVoidPolyType()},
-				Method{"Say_Hi", []Property{}, stringType},
-				Method{"getPeople", []Property{
-						Property{"params", 
-							PolyType{"string", "string", false, true, false}},
-					}, PolyType{"Person", "", false, false, true}},
+			Method{"Create", []Property{Property{"p", personType}},
+				resultType},
+			Method{"Add", []Property{Property{"a", intType},
+				Property{"b", intType}}, intType},
+			Method{"StoreName", []Property{Property{"name", stringType}},
+				NewVoidPolyType()},
+			Method{"Say_Hi", []Property{}, stringType},
+			Method{"getPeople", []Property{
+				Property{"params",
+					PolyType{"string", "string", false, true, false}},
+			}, PolyType{"Person", "", false, false, true}},
 		}},
 	}
 	expected := Package{"foolib", structs, ifaces}
@@ -79,7 +79,7 @@ func TestParseExample(t *testing.T) {
 	if !reflect.DeepEqual(expected.Interfaces, pkg.Interfaces) {
 		t.Errorf("%v != %v", expected.Interfaces, pkg.Interfaces)
 	}
-}   
+}
 
 // Validation tests
 //
@@ -127,7 +127,7 @@ var illegalIdl = []string{
 }
 
 func TestIllegalIdl(t *testing.T) {
-	for _, s := range(illegalIdl) {
+	for _, s := range illegalIdl {
 		s = "package foopkg\n" + s
 		_, err := Parse("example1.go", s)
 		//fmt.Printf("err=%v\n", err)
@@ -136,4 +136,3 @@ func TestIllegalIdl(t *testing.T) {
 		}
 	}
 }
-

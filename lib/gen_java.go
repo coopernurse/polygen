@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type JavaGenerator struct { }
+type JavaGenerator struct{}
 
 func (g JavaGenerator) GenFiles(p *Package) []File {
 	files := make([]File, 0)
@@ -51,7 +51,7 @@ func ScalarJavaType(t string) string {
 
 func JavaType(t PolyType) string {
 	if t.IsMap {
-		return fmt.Sprintf("java.util.Map<%s,%s>", 
+		return fmt.Sprintf("java.util.Map<%s,%s>",
 			ScalarJavaType(t.MapKeyType), ScalarJavaType(t.GoType))
 	} else if t.IsList {
 		return fmt.Sprintf("java.util.List<%s>", ScalarJavaType(t.GoType))
@@ -82,7 +82,7 @@ func ParamsAsList(m Method) string {
 	b := NewStrBuf("//")
 	b.raw("java.util.Arrays.asList(")
 	for x := 0; x < len(m.Args); x++ {
-		if x > 0 { 
+		if x > 0 {
 			b.raw(",")
 		}
 		b.fraw("%s", VarName(m.Args[x].Name))
@@ -96,7 +96,7 @@ func MethodSig(m Method) string {
 	b := NewStrBuf("//")
 	b.fraw("public %s %s(", ret, m.Name)
 	for x := 0; x < len(m.Args); x++ {
-		if x > 0 { 
+		if x > 0 {
 			b.raw(", ")
 		}
 		b.fraw("%s %s", JavaType(m.Args[x].Type), VarName(m.Args[x].Name))
@@ -176,8 +176,7 @@ func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
 	b.w("          try {")
 	for i := 0; i < len(iface.Methods); i++ {
 		m := iface.Methods[i]
-		
-		
+
 		b.raw("            ")
 		if i > 0 {
 			b.raw("else ")
@@ -192,7 +191,7 @@ func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
 		for x := 0; x < len(m.Args); x++ {
 			prefix := "_par"
 			if len(m.Args) > 1 {
-				prefix  += fmt.Sprintf(".get(%d)", x)
+				prefix += fmt.Sprintf(".get(%d)", x)
 			}
 			arg := m.Args[x]
 			if x > 0 {
@@ -216,13 +215,13 @@ func (g JavaGenerator) genServiceDispatcher(p *Package, iface Interface) File {
 			b.f("              _resp.put(\"result\", _m.valueToTree(_service.%s(%s)));", m.Name, params)
 		} else {
 			b.f("              _resp.put(\"result\", _service.%s(%s));", m.Name, params)
-		} 
+		}
 		b.w("              _resp.put(\"jsonrpc\", \"2.0\");")
 		b.w("              _resp.put(\"id\", _id);")
 		b.w("              return _resp.toString();")
 		b.w("            }")
 	}
-    b.w("            else { return rpcErr(_resp, -32601, \"Method not found: \" + _meth, _id); }")
+	b.w("            else { return rpcErr(_resp, -32601, \"Method not found: \" + _meth, _id); }")
 	b.w("          }")
 	b.w("          catch (RPCException e) { return rpcErr(_resp, e.getCode(), e.getMessage(), _id); }")
 	b.w("          catch (Throwable t) { return rpcErr(_resp, -32005, \"Unknown error: \" + t.getMessage(), _id); }")
@@ -270,14 +269,14 @@ func (g JavaGenerator) genServiceClient(p *Package, iface Interface) File {
 		b.f("    %s {", MethodSig(m))
 		if len(m.Args) == 0 {
 			b.f("        %s.BaseReqObj _rq = ", tclass)
-            b.f("          new %s.BaseReqObj(\"%s\");", tclass, mname)
+			b.f("          new %s.BaseReqObj(\"%s\");", tclass, mname)
 		} else if len(m.Args) == 1 {
 			b.f("        %s.BaseParamsReqObj _rq = ", tclass)
-            b.f("          new %s.BaseParamsReqObj(\"%s\", %s);", 
+			b.f("          new %s.BaseParamsReqObj(\"%s\", %s);",
 				tclass, mname, VarName(m.Args[0].Name))
 		} else {
 			b.f("        %s.BaseParamsReqObj _rq = ", tclass)
-            b.f("          new %s.BaseParamsReqObj(\"%s\", %s);", 
+			b.f("          new %s.BaseParamsReqObj(\"%s\", %s);",
 				tclass, mname, ParamsAsList(m))
 		}
 		b.w("        ObjectMapper _m = new ObjectMapper();")
@@ -285,8 +284,8 @@ func (g JavaGenerator) genServiceClient(p *Package, iface Interface) File {
 		b.w("            String _j = _prv.execRPC(_m.writeValueAsString(_rq));")
 		if m.ReturnType.IsVoid {
 			b.f("          %s.BaseRespObj _resp = ", tclass)
-            b.f("            new %s.BaseRespObj(_m, _j);", tclass)
-            b.w("          if (_resp.getError() != null) ")
+			b.f("            new %s.BaseRespObj(_m, _j);", tclass)
+			b.w("          if (_resp.getError() != null) ")
 			b.w("            throw new RPCException(_resp.getError());")
 		} else {
 			rtype := tclass + "." + ServiceResponseType(m.ReturnType)
@@ -304,7 +303,7 @@ func (g JavaGenerator) genServiceClient(p *Package, iface Interface) File {
 
 func (g JavaGenerator) genServiceTypes(p *Package, iface Interface) File {
 	cname := iface.Name + "Types"
-	retTypes := make(map[string] bool)
+	retTypes := make(map[string]bool)
 	b := StartFile(p)
 	b.w("import org.codehaus.jackson.map.ObjectMapper;")
 	b.w("import org.codehaus.jackson.JsonNode;")
@@ -320,7 +319,7 @@ func (g JavaGenerator) genServiceTypes(p *Package, iface Interface) File {
 			resptype := ServiceResponseType(rtype)
 			if _, ok := retTypes[resptype]; !ok {
 				retTypes[resptype] = true
-			
+
 				b.f("    public static class %s extends BaseRespObj {", resptype)
 				b.f("        %s result;", jtype)
 				b.f("        public %s(ObjectMapper m, String j) throws java.io.IOException {", resptype)
@@ -337,12 +336,12 @@ func (g JavaGenerator) genServiceTypes(p *Package, iface Interface) File {
 					b.f("                result = root.get(\"result\").as%s();", jtype)
 				}
 				b.w("        }")
-                b.f("        public %s getResult() throws RPCException {", jtype)
-                b.w("            if (error != null) throw new RPCException(error);")
-                b.w("            else return result;")
-                b.w("        }")
-                b.w("    }")
-                b.blank()
+				b.f("        public %s getResult() throws RPCException {", jtype)
+				b.w("            if (error != null) throw new RPCException(error);")
+				b.w("            else return result;")
+				b.w("        }")
+				b.w("    }")
+				b.blank()
 			}
 		}
 	}
@@ -354,11 +353,11 @@ func (g JavaGenerator) genRPCException(p *Package) File {
 	cname := "RPCException"
 	b := StartFile(p)
 	b.f("public class %s extends Exception {", cname)
-	b.w("    private int code;");
+	b.w("    private int code;")
 	b.w("    public RPCException(int code, String msg) {")
 	b.w("        super(msg); this.code = code;")
 	b.w("    }")
-	b.w("    public RPCException(RPCError err) {");
+	b.w("    public RPCException(RPCError err) {")
 	b.w("        this(err.getCode(), err.getMessage());")
 	b.w("    }")
 	b.w("    public int getCode() { return this.code; }")
